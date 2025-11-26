@@ -1,5 +1,5 @@
 import { Mt5Client } from '../../mt5/Mt5Client';
-import { UserInfo, UserAddParams, UserUpdateParams, UserBatchParams, UserChangePasswordParams, PasswordType } from '../../mt5/types/user.types';
+import { UserInfo, UserAddParams, UserUpdateParams, UserChangePasswordParams, PasswordType } from './types/user.types';
 
 export class UserService {
     constructor(private mt5: Mt5Client) { }

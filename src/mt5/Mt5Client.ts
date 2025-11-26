@@ -2,7 +2,10 @@ import crypto from 'crypto';
 import https from 'https';
 import { BrokerConfig } from '../config/brokers';
 import { Mt5Response } from './types/common';
-import { UserInfo, UserAddParams, UserUpdateParams, UserBatchParams, UserChangePasswordParams, PasswordType } from './types/user.types';
+import { UserInfo, UserAddParams, UserUpdateParams, UserBatchParams, UserChangePasswordParams, PasswordType } from '../modules/user/types/user.types';
+import { OrderInfo } from '../modules/trading/types/order.types';
+import { PositionInfo } from '../modules/trading/types/position.types';
+import { TradeBalanceParams, TradeBalanceResponse } from '../modules/trading/types/trade.types';
 
 // Allow insecure TLS like the original PHP implementation that disabled peer verification.
 // This is required when the MT5 server uses a cert that Node won't validate.
@@ -263,6 +266,10 @@ export class Mt5Client {
         return this.request<UserInfo>('/api/user/get', 'GET', { login });
     }
 
+    async getOrder(ticket: number): Promise<OrderInfo> {
+        return this.request<OrderInfo>('/api/order/get', 'GET', { ticket });
+    }
+
     async getUserBatch(params: UserBatchParams): Promise<UserInfo[]> {
         // MT5 only allows ONE of login OR group, not both
         if (params.login && params.group) {
@@ -315,5 +322,64 @@ export class Mt5Client {
 
     async changePassword(params: UserChangePasswordParams): Promise<void> {
         return this.request<void>('/api/user/change_password', 'POST', params);
+    }
+
+    async getOrderBatch(tickets: number[]): Promise<OrderInfo[]> {
+        if (!tickets || tickets.length === 0) return [];
+        return Promise.all(tickets.map(t => this.getOrder(t)));
+    }
+
+    async getOrderTotal(login: number): Promise<number> {
+        // We need to be flexible with how the MT5 server returns the value (Total vs total, number vs string)
+        const res = await this.request<any>('/api/order/get_total', 'GET', { login });
+        // Look for several possible locations
+        const possible = [
+            res?.Total,
+            res?.total,
+            res?.Answer?.Total,
+            res?.Answer?.total,
+            res?.answer?.Total,
+            res?.answer?.total,
+        ];
+
+        const found = possible.find(x => x !== undefined && x !== null);
+        if (found === undefined) {
+            // Log for debug in development — helps identify why total was 0
+            console.warn('[Mt5Client] getOrderTotal: no Total found in response', res);
+            return 0;
+        }
+
+        const totalNum = Number(String(found).replace(/[^0-9\-\.]/g, ''));
+        return Number.isNaN(totalNum) ? 0 : totalNum;
+    }
+
+    async getOrderTotalRaw(login: number): Promise<any> {
+        return await this.request<any>('/api/order/get_total', 'GET', { login });
+    }
+
+    // History endpoints
+    async getHistoryOrder(ticket: number): Promise<OrderInfo> {
+        return this.request<OrderInfo>('/api/history/get', 'GET', { ticket });
+    }
+
+    async getHistoryOrderBatch(tickets: number[]): Promise<OrderInfo[]> {
+        if (!tickets || tickets.length === 0) return [];
+        return Promise.all(tickets.map(t => this.getHistoryOrder(t)));
+    }
+
+    // Position endpoints
+    async getPosition(login: number, symbol: string): Promise<PositionInfo> {
+        return this.request<PositionInfo>('/api/position/get', 'GET', { login, symbol });
+    }
+
+    async getPositionBatch(login: number, symbol: string): Promise<PositionInfo[]> {
+        // Some servers may return a list for hedging accounts
+        return this.request<PositionInfo[]>('/api/position/get_batch', 'GET', { login, symbol });
+    }
+
+    // Trade endpoints (deposit/withdraw)
+    async tradeBalance(params: TradeBalanceParams): Promise<TradeBalanceResponse> {
+        // This will call /api/trade/balance (GET if query params provided, POST if body provided)
+        return await this.request<TradeBalanceResponse>('/api/trade/balance', 'GET', params);
     }
 }

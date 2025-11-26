@@ -1,14 +1,13 @@
 import { Request, Response } from 'express';
 import { UserService } from './user.service';
 import { getMt5Client } from '../../mt5/instances';
-import type { PasswordType } from '../../mt5/types/user.types';
+import type { PasswordType } from './types/user.types';
 
 export class UserController {
     static async getUser(req: Request, res: Response) {
-        const { brokerId } = req.params;
         const { login } = req.query;
         try {
-            const mt5 = getMt5Client(brokerId as string);
+            const mt5 = getMt5Client();
             const service = new UserService(mt5);
             const user = await service.getUser(Number(login));
             res.json({ success: true, data: user });
@@ -18,7 +17,6 @@ export class UserController {
     }
 
     static async getUserBatch(req: Request, res: Response) {
-        const { brokerId } = req.params;
 
         // Accept params from query (GET) or body (POST)
         const rawLogin = req.query.login ?? req.body.login;
@@ -51,7 +49,7 @@ export class UserController {
             });
         }
 
-        const mt5 = getMt5Client(brokerId as string);
+        const mt5 = getMt5Client();
         const service = new UserService(mt5);
 
         try {
@@ -63,8 +61,7 @@ export class UserController {
     }
 
     static async addUser(req: Request, res: Response) {
-        const { brokerId } = req.params;
-        const mt5 = getMt5Client(brokerId as string);
+        const mt5 = getMt5Client();
         const service = new UserService(mt5);
 
         try {
@@ -76,8 +73,7 @@ export class UserController {
     }
 
     static async updateUser(req: Request, res: Response) {
-        const { brokerId } = req.params;
-        const mt5 = getMt5Client(brokerId as string);
+        const mt5 = getMt5Client();
         const service = new UserService(mt5);
 
         try {
@@ -89,7 +85,6 @@ export class UserController {
     }
 
     static async deleteUser(req: Request, res: Response) {
-        const { brokerId } = req.params;
         // Accept login from body (POST) OR query (GET)
         const login = req.body.login ?? req.query.login;
 
@@ -100,7 +95,7 @@ export class UserController {
             });
         }
 
-        const mt5 = getMt5Client(brokerId as string);
+        const mt5 = getMt5Client();
         const service = new UserService(mt5);
 
         try {
@@ -112,7 +107,6 @@ export class UserController {
     }
 
     static async checkPassword(req: Request, res: Response) {
-        const { brokerId } = req.params;
 
         // Support BOTH query params (GET) and body (POST)
         const login = req.query.login ?? req.body.login;
@@ -137,7 +131,7 @@ export class UserController {
             });
         }
 
-        const mt5 = getMt5Client(brokerId as string);
+        const mt5 = getMt5Client();
         const service = new UserService(mt5);
 
         try {
@@ -172,8 +166,7 @@ export class UserController {
     }
 
     static async changePassword(req: Request, res: Response) {
-        const { brokerId } = req.params;
-        const mt5 = getMt5Client(brokerId as string);
+        const mt5 = getMt5Client();
         const service = new UserService(mt5);
 
         try {
