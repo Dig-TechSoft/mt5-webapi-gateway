@@ -306,14 +306,45 @@ export class UserController {
     }
 
     static async changePassword(req: Request, res: Response) {
+        // Accept GET or POST, and accept Login/Type/Password keys in body or query.
+        const loginRaw = req.body?.Login ?? req.body?.login ?? req.query?.login;
+        const typeRaw = req.body?.Type ?? req.body?.type ?? req.query?.type;
+        const passwordRaw = req.body?.Password ?? req.body?.password ?? req.query?.password;
+
+        if (!loginRaw || !typeRaw || !passwordRaw) {
+            return res.status(400).json({ success: false, error: 'Missing login, type, or password' });
+        }
+
+        const login = Number(loginRaw);
+        if (isNaN(login)) {
+            return res.status(400).json({ success: false, error: 'Invalid login parameter' });
+        }
+
+        const type = String(typeRaw).toLowerCase();
+        const validTypes = ['main', 'investor', 'api'];
+        if (!validTypes.includes(type)) {
+            return res.status(400).json({ success: false, error: 'Invalid type. Must be: main, investor, or api' });
+        }
+
+        const password = String(passwordRaw);
+
         const mt5 = getMt5Client();
         const service = new UserService(mt5);
 
         try {
-            await service.changePassword(req.body);
-            res.json({ success: true });
+            const raw = await service.changePassword({ login, type: type as any, password });
+
+            const includeRaw = String(req.query.raw ?? req.body.raw ?? 'false').toLowerCase() === 'true';
+            if (includeRaw) return res.json(raw);
+
+            if (raw && String(raw.retcode || '').startsWith('0')) {
+                return res.json({ success: true, retcode: raw.retcode });
+            }
+
+            // Return raw retcode on failure
+            return res.json({ retcode: raw?.retcode ?? 'Unknown' });
         } catch (err: any) {
-            res.status(400).json({ success: false, error: err.message });
+            return res.status(500).json({ success: false, error: err.message });
         }
     }
 }

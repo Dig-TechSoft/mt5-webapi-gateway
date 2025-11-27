@@ -193,6 +193,31 @@ Example response:
 }
 ```
 
+### User Change Password
+
+- POST (recommended): http://127.0.0.1:3000/api/user/change_password
+
+JSON body:
+
+```json
+{
+  "Login": 764636,
+  "Type": "main",
+  "Password": "ps12Rt12"
+}
+```
+
+Example response:
+
+```json
+{ "retcode": "0 Done" }
+```
+
+Notes:
+
+- For security reasons, prefer sending password in JSON POST body rather than query string.
+- The API also accepts GET-style requests (login/type/password in query), but this is discouraged due to logging.
+
 ## Order endpoints
 
 - GET /api/order/get/:brokerId?ticket=<ticket> — Get a single order by ticket

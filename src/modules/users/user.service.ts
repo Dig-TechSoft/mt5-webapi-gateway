@@ -29,7 +29,7 @@ export class UserService {
         return await this.mt5.checkPassword(login, password, type);
     }
 
-    async changePassword(params: UserChangePasswordParams): Promise<void> {
+    async changePassword(params: UserChangePasswordParams): Promise<Mt5Response<any>> {
         return await this.mt5.changePassword(params);
     }
 

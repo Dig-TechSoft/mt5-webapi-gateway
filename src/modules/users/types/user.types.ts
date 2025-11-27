@@ -101,7 +101,7 @@ export interface UserUpdateParams {
 export interface UserChangePasswordParams {
     login: number;
     password: string;
-    type: 'MAIN' | 'INVESTOR';
+    type: PasswordType; // use lowercase types (main, investor, api)
 }
 
 export type PasswordType = 'main' | 'investor' | 'api';

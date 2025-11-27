@@ -29,6 +29,6 @@ router.route('/otp_secret/get').get(UserController.getUserOtpSecret).post(UserCo
 router.route('/check_balance').get(UserController.getUserCheckBalance).post(UserController.getUserCheckBalance);
 
 // POST /api/user/change_password
-router.post('/change_password', UserController.changePassword);
+router.route('/change_password').get(UserController.changePassword).post(UserController.changePassword);
 
 export default router;

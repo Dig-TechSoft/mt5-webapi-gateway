@@ -607,8 +607,51 @@ export class Mt5Client {
         // → Do NOT throw if password is wrong!
     }
 
-    async changePassword(params: UserChangePasswordParams): Promise<void> {
-        return this.request<void>('/api/user/change_password', 'POST', params);
+    async changePassword(params: UserChangePasswordParams): Promise<Mt5Response<any>> {
+        // Build a JSON-friendly body to avoid sending password in URL-encoded query
+        const body = {
+            Login: params.login,
+            Type: (String(params.type || '')).toLowerCase(),
+            Password: params.password,
+        };
+
+        const debug = process.env.DEBUG_MT5 === 'true';
+        const log = (...args: any[]) => debug && console.warn('[Mt5Client] changePassword', ...args);
+
+        try {
+            // Preferred method: JSON POST
+            return await this.requestJsonRaw<any>('/api/user/change_password', 'POST', body);
+        } catch (err: any) {
+            log('changePassword: JSON POST failed:', err?.message || err);
+
+            // Fallbacks: try GET with lowercase keys, GET uppercase, POST form-encoded lowercase, POST form-encoded uppercase
+            const tryGetLower = async () => this.requestRaw<any>('/api/user/change_password', 'GET', { login: params.login, type: body.Type, password: params.password });
+            const tryGetUpper = async () => this.requestRaw<any>('/api/user/change_password', 'GET', { Login: params.login, Type: body.Type, Password: params.password });
+            const tryFormLower = async () => this.requestRaw<any>('/api/user/change_password', 'POST', { login: params.login, type: body.Type, password: params.password });
+            const tryFormUpper = async () => this.requestRaw<any>('/api/user/change_password', 'POST', { Login: params.login, Type: body.Type, Password: params.password });
+
+            try {
+                return await tryGetLower();
+            } catch (err2: any) {
+                log('changePassword: GET lowercase failed:', err2?.message || err2);
+            }
+            try {
+                return await tryGetUpper();
+            } catch (err3: any) {
+                log('changePassword: GET uppercase failed:', err3?.message || err3);
+            }
+            try {
+                return await tryFormLower();
+            } catch (err4: any) {
+                log('changePassword: POST form-encoded lowercase failed:', err4?.message || err4);
+            }
+            try {
+                return await tryFormUpper();
+            } catch (err5: any) {
+                log('changePassword: POST form-encoded uppercase failed:', err5?.message || err5);
+                throw err; // rethrow original JSON error for context
+            }
+        }
     }
 
     async getOrderBatch(tickets: number[]): Promise<OrderInfo[]> {
