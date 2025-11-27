@@ -110,3 +110,36 @@ export interface UserBatchParams {
     login?: number[];
     group?: string[];
 }
+
+export interface UserAccountInfo {
+    Login?: string | number;
+    CurrencyDigits?: string | number;
+    Balance?: string | number;
+    Credit?: string | number;
+    Margin?: string | number;
+    MarginFree?: string | number;
+    MarginLevel?: string | number;
+    MarginLeverage?: string | number;
+    Profit?: string | number;
+    [key: string]: any;
+}
+
+export type UserLogins = string[];
+
+export type UserCertificate = string[];
+
+export type UserOtpSecret = string;
+
+export interface UserOtpSecretResponse {
+    OTP_SECRET?: string;
+}
+
+export interface UserBalanceHistoryItem {
+    User?: string | number;
+    History?: string | number;
+}
+
+export interface UserCheckBalanceResponse {
+    Balance?: UserBalanceHistoryItem;
+    Credit?: UserBalanceHistoryItem;
+}

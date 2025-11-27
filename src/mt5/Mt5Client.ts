@@ -2,9 +2,10 @@ import crypto from 'crypto';
 import https from 'https';
 import { BrokerConfig } from '../config/brokers';
 import { Mt5Response } from './types/common';
-import { UserInfo, UserAddParams, UserUpdateParams, UserBatchParams, UserChangePasswordParams, PasswordType } from '../modules/user/types/user.types';
+import { UserInfo, UserAddParams, UserUpdateParams, UserBatchParams, UserChangePasswordParams, PasswordType } from '../modules/users/types/user.types';
 import { OrderInfo } from '../modules/trading/types/order.types';
 import { PositionInfo } from '../modules/trading/types/position.types';
+import { PriceQuote, TickLastResponse } from '../modules/prices/types/price.types';
 import { TradeBalanceParams, TradeBalanceResponse } from '../modules/trading/types/trade.types';
 
 // Allow insecure TLS like the original PHP implementation that disabled peer verification.
@@ -262,8 +263,251 @@ export class Mt5Client {
         }
     }
 
+    // A helper to send raw JSON bodies (some MT5 endpoints expect JSON instead of x-www-form-urlencoded)
+    private async requestJson<T>(
+        path: string,
+        method: 'GET' | 'POST',
+        jsonBody?: any,
+        retryCount = 0
+    ): Promise<T> {
+        await this.ensureAuth();
+
+        let query = '';
+        let body: string | undefined = undefined;
+
+        if (jsonBody && method === 'GET') {
+            const sp = new URLSearchParams();
+            Object.entries(jsonBody).forEach(([k, v]) => {
+                if (v !== undefined && v !== null) sp.append(k, String(v));
+            });
+            const paramStr = sp.toString();
+            query = paramStr ? '?' + paramStr : '';
+        } else if (jsonBody && method === 'POST') {
+            body = JSON.stringify(jsonBody);
+        }
+
+        try {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            const init: RequestInit = { method, headers } as any;
+            if (body) init.body = body;
+
+            const resRaw = await this.fetchRaw(path + query, init);
+            const res = JSON.parse(resRaw) as Mt5Response<T>;
+
+            if (res.retcode !== '0 Done') {
+                throw new Error(`MT5 Error: ${res.retcode}`);
+            }
+
+            return res.answer;
+        } catch (error: any) {
+            if (error.message?.includes('403') && retryCount === 0) {
+                console.log('[AUTH] Got 403 error, resetting authentication and retrying...');
+                this.isAuthenticated = false;
+                this.cookies = '';
+                return this.requestJson<T>(path, method, jsonBody, retryCount + 1);
+            }
+
+            if (error.message?.includes('MT5 Error') && error.message?.includes('Invalid')) {
+                console.log('[AUTH] Got MT5 session error, resetting authentication for next request...');
+                this.isAuthenticated = false;
+                this.cookies = '';
+            }
+
+            throw error;
+        }
+    }
+
+    private async requestJsonRaw<T>(
+        path: string,
+        method: 'GET' | 'POST',
+        jsonBody?: any,
+        retryCount = 0
+    ): Promise<Mt5Response<T>> {
+        await this.ensureAuth();
+
+        let query = '';
+        let body: string | undefined = undefined;
+
+        if (jsonBody && method === 'GET') {
+            const sp = new URLSearchParams();
+            Object.entries(jsonBody).forEach(([k, v]) => {
+                if (v !== undefined && v !== null) sp.append(k, String(v));
+            });
+            const paramStr = sp.toString();
+            query = paramStr ? '?' + paramStr : '';
+        } else if (jsonBody && method === 'POST') {
+            body = JSON.stringify(jsonBody);
+        }
+
+        try {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            const init: RequestInit = { method, headers } as any;
+            if (body) init.body = body;
+
+            const resRaw = await this.fetchRaw(path + query, init);
+            const res = JSON.parse(resRaw) as Mt5Response<T>;
+            return res;
+        } catch (error: any) {
+            if (error.message?.includes('403') && retryCount === 0) {
+                console.log('[AUTH] Got 403 error, resetting authentication and retrying...');
+                this.isAuthenticated = false;
+                this.cookies = '';
+                return this.requestJsonRaw<T>(path, method, jsonBody, retryCount + 1);
+            }
+
+            throw error;
+        }
+    }
+
+    // Return raw Mt5Response without throwing (useful when we want the retcode even if non-zero)
+    private async requestRaw<T>(
+        path: string,
+        method: 'GET' | 'POST',
+        params?: any,
+        retryCount = 0
+    ): Promise<Mt5Response<T>> {
+        await this.ensureAuth();
+
+        let body: string | undefined = undefined;
+        let query = '';
+
+        if (params) {
+            const sp = new URLSearchParams();
+            Object.entries(params).forEach(([k, v]) => {
+                if (v !== undefined && v !== null) {
+                    sp.append(k, String(v));
+                }
+            });
+
+            const paramStr = sp.toString();
+
+            if (method === 'GET') {
+                query = paramStr ? '?' + paramStr : '';
+            } else if (method === 'POST') {
+                body = paramStr;  // only set body for POST
+            }
+        }
+
+        try {
+            const init: RequestInit = { method };
+            if (body) {
+                init.body = body;
+                init.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+            }
+
+            const resRaw = await this.fetchRaw(path + query, init);
+            const res = JSON.parse(resRaw) as Mt5Response<T>;
+            return res;
+        } catch (error: any) {
+            if (error.message?.includes('403') && retryCount === 0) {
+                console.log('[AUTH] Got 403 error, resetting authentication and retrying...');
+                this.isAuthenticated = false;
+                this.cookies = '';
+                return this.requestRaw<T>(path, method, params, retryCount + 1);
+            }
+            throw error;
+        }
+    }
+
     async getUser(login: number): Promise<UserInfo> {
         return this.request<UserInfo>('/api/user/get', 'GET', { login });
+    }
+
+    async getUserGroup(login: number): Promise<string> {
+        // The MT5 response includes: { retcode: '0 Done', answer: { Group: '...' } }
+        const res = await this.request<{ Group: string }>('/api/user/group', 'GET', { login });
+        return res?.Group ?? '';
+    }
+
+    async getUserGroupRaw(login: number): Promise<Mt5Response<{ Group: string }>> {
+        return await this.requestRaw<{ Group: string }>('/api/user/group', 'GET', { login });
+    }
+
+    async getUserTotal(): Promise<number> {
+        // Returns numeric total using standard request which throws on non-zero retcode
+        const res = await this.request<{ Total: string | number }>('/api/user/total', 'GET');
+        const anyRes: any = res;
+        const possible = [anyRes?.Total, anyRes?.total, anyRes?.Answer?.Total, anyRes?.Answer?.total, anyRes?.answer?.Total, anyRes?.answer?.total];
+        const found = possible.find(x => x !== undefined && x !== null);
+        if (found === undefined) return 0;
+        const totalNum = Number(String(found).replace(/[^0-9\-\.]/g, ''));
+        return Number.isNaN(totalNum) ? 0 : totalNum;
+    }
+
+    async getUserTotalRaw(): Promise<Mt5Response<{ Total: string }>> {
+        return await this.requestRaw<{ Total: string }>('/api/user/total', 'GET');
+    }
+
+    async getUserAccount(login: number): Promise<any> {
+        return await this.request<any>('/api/user/account/get', 'GET', { login });
+    }
+
+    async getUserAccountRaw(login: number): Promise<Mt5Response<any>> {
+        return await this.requestRaw<any>('/api/user/account/get', 'GET', { login });
+    }
+
+    async getUserLogins(groups: string[]): Promise<number[]> {
+        if (!groups || groups.length === 0) return [];
+        const groupParam = groups.join(',');
+        const res = await this.request<string[]>('/api/user/logins', 'GET', { group: groupParam });
+        if (!res || !Array.isArray(res)) return [];
+        return res.map(s => Number(s)).filter(n => !isNaN(n));
+    }
+
+    async getUserLoginsRaw(groups: string[]): Promise<Mt5Response<string[]>> {
+        const groupParam = (groups && groups.length) ? groups.join(',') : undefined;
+        return await this.requestRaw<string[]>('/api/user/logins', 'GET', groupParam ? { group: groupParam } : undefined);
+    }
+
+    async getUserCertificate(login: number): Promise<string[]> {
+        return await this.request<string[]>('/api/user/certificate/get', 'GET', { login });
+    }
+
+    async getUserCertificateRaw(login: number): Promise<Mt5Response<string[]>> {
+        return await this.requestRaw<string[]>('/api/user/certificate/get', 'GET', { login });
+    }
+
+    async getUserOtpSecret(login: number): Promise<string> {
+        const res = await this.request<{ OTP_SECRET: string }>('/api/user/otp_secret/get', 'GET', { login });
+        const anyRes: any = res;
+        // Accept various casing: OTP_SECRET / otp_secret
+        const possible = [anyRes?.OTP_SECRET, anyRes?.otp_secret, anyRes?.Answer?.OTP_SECRET, anyRes?.Answer?.otp_secret, anyRes?.answer?.OTP_SECRET, anyRes?.answer?.otp_secret];
+        const found = possible.find(x => x !== undefined && x !== null);
+        return (found === undefined) ? '' : String(found);
+    }
+
+    async getUserOtpSecretRaw(login: number): Promise<Mt5Response<{ OTP_SECRET: string }>> {
+        return await this.requestRaw<{ OTP_SECRET: string }>('/api/user/otp_secret/get', 'GET', { login });
+    }
+
+    async getUserCheckBalance(login: number, fixflag?: number): Promise<{ Balance?: any; Credit?: any }> {
+        const params: any = { login };
+        if (fixflag !== undefined && fixflag !== null) params.fixflag = Number(fixflag);
+        const res = await this.request<{ Balance: any; Credit: any }>('/api/user/check_balance', 'GET', params);
+        return res;
+    }
+
+    async getUserCheckBalanceRaw(login: number, fixflag?: number): Promise<Mt5Response<{ Balance: any; Credit: any }>> {
+        const params: any = { login };
+        if (fixflag !== undefined && fixflag !== null) params.fixflag = Number(fixflag);
+        return await this.requestRaw<{ Balance: any; Credit: any }>('/api/user/check_balance', 'GET', params);
+    }
+
+    // Prices - Get latest tick(s) for symbol(s)
+    async getTickLast(symbols: string | string[], trans_id?: number | string): Promise<TickLastResponse> {
+        const symbolParam = Array.isArray(symbols) ? symbols.join(',') : symbols;
+        const params: any = { symbol: symbolParam };
+        if (trans_id !== undefined && trans_id !== null) params.trans_id = trans_id;
+        // Use raw request so we can return the trans_id as well
+        const raw = await this.requestRaw<PriceQuote[]>('/api/tick/last', 'GET', params);
+        return { trans_id: raw?.trans_id, answer: raw?.answer } as TickLastResponse;
+    }
+
+    async getTickLastRaw(symbols: string | string[], trans_id?: number | string): Promise<Mt5Response<PriceQuote[]>> {
+        const symbolParam = Array.isArray(symbols) ? symbols.join(',') : symbols;
+        const params: any = { symbol: symbolParam };
+        if (trans_id !== undefined && trans_id !== null) params.trans_id = trans_id;
+        return await this.requestRaw<PriceQuote[]>('/api/tick/last', 'GET', params);
     }
 
     async getOrder(ticket: number): Promise<OrderInfo> {
@@ -302,22 +546,65 @@ export class Mt5Client {
         return this.request<void>('/api/user/delete', 'GET', { login });
     }
 
-    async checkPassword(login: number, password: string, type: PasswordType): Promise<void> {
-        // Use POST + JSON body (security best practice)
+    async checkPassword(login: number, password: string, type: PasswordType): Promise<Mt5Response<any>> {
+        // Use POST + JSON body (security best practice) and fallback on error
         const body = {
             Login: login,
             Type: type.toLowerCase(),        // MT5 expects lowercase!
             Password: password
         };
 
-        // Important: send as raw JSON, not form-urlencoded
-        const res = await this.request<any>('/api/user/check_password', 'POST', body);
+        // Try JSON POST first (preferred), then try GET query if 400 error, then try form POST as last resort
+        // Try JSON POST first (preferred), then try GET with lowercase and uppercase keys, then try form POST
+        const debug = process.env.DEBUG_MT5 === 'true';
+        const log = (...args: any[]) => debug && console.warn('[Mt5Client]', ...args);
 
+        try {
+            return await this.requestJsonRaw<any>('/api/user/check_password', 'POST', body);
+        } catch (err: any) {
+            const msg = err.message || '';
+            log('checkPassword: JSON POST failed:', msg);
+
+            // If the server rejected JSON (400 or 415) or unknown error, try GET with lowercase then uppercase keys; then try POST form-encoded
+            const tryGetLower = async () => this.requestRaw<any>('/api/user/check_password', 'GET', { login, type: type.toLowerCase(), password });
+            const tryGetUpper = async () => this.requestRaw<any>('/api/user/check_password', 'GET', { Login: login, Type: type.toLowerCase(), Password: password });
+            const tryFormLower = async () => this.requestRaw<any>('/api/user/check_password', 'POST', { login, type: type.toLowerCase(), password });
+            const tryFormUpper = async () => this.requestRaw<any>('/api/user/check_password', 'POST', { Login: login, Type: type.toLowerCase(), Password: password });
+
+            try {
+                // First fallback: GET lowercase
+                return await tryGetLower();
+            } catch (err2: any) {
+                log('checkPassword: GET lowercase failed:', err2.message || err2);
+            }
+
+            try {
+                // Second fallback: GET uppercase
+                return await tryGetUpper();
+            } catch (err3: any) {
+                log('checkPassword: GET uppercase failed:', err3.message || err3);
+            }
+
+            try {
+                // Third fallback: POST form-encoded lowercase
+                return await tryFormLower();
+            } catch (err4: any) {
+                log('checkPassword: POST form-encoded lowercase failed:', err4.message || err4);
+            }
+
+            // Last resort: POST form-encoded uppercase
+            try {
+                return await tryFormUpper();
+            } catch (err5: any) {
+                log('checkPassword: POST form-encoded uppercase failed:', err5.message || err5);
+                // rethrow original error from JSON POST to keep context
+                throw err;
+            }
+        }
         // MT5 returns retcode "0 Done" on correct password
         // On wrong password: "3006 Invalid account password" → still valid response!
         // So we only throw on real errors (auth, network, etc.)
         // → Do NOT throw if password is wrong!
-        return;
     }
 
     async changePassword(params: UserChangePasswordParams): Promise<void> {

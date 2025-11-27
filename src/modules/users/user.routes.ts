@@ -19,6 +19,14 @@ router.route('/delete').get(UserController.deleteUser).post(UserController.delet
 
 // POST /api/user/check_password
 router.route('/check_password').get(UserController.checkPassword).post(UserController.checkPassword);
+router.route('/group').get(UserController.getUserGroup).post(UserController.getUserGroup);
+router.route('/total').get(UserController.getUserTotal).post(UserController.getUserTotal);
+router.route('/account/get').get(UserController.getUserAccount).post(UserController.getUserAccount);
+import { UserLoginsController } from './user.logins.controller';
+router.route('/logins').get(UserLoginsController.getUserLogins).post(UserLoginsController.getUserLogins);
+router.route('/certificate/get').get(UserController.getUserCertificate).post(UserController.getUserCertificate);
+router.route('/otp_secret/get').get(UserController.getUserOtpSecret).post(UserController.getUserOtpSecret);
+router.route('/check_balance').get(UserController.getUserCheckBalance).post(UserController.getUserCheckBalance);
 
 // POST /api/user/change_password
 router.post('/change_password', UserController.changePassword);
