@@ -60,27 +60,209 @@ export class UserController {
         }
     }
 
+    /**
+     * Add a new user account to the MT5 trade server.
+     * 
+     * Accepts parameters from:
+     * - Query string: login, group, name, leverage, rights, company, language, city, state, etc.
+     * - Request body (JSON): PassMain, PassInvestor, PhonePassword, MQID, Company, Country, City, etc.
+     * 
+     * Body parameters override query parameters.
+     * 
+     * Required fields: PassMain (or pass_main), PassInvestor (or pass_investor), Group (or group), Name (or name)
+     * 
+     * Response format:
+     * {
+     *   "retcode": "0 Done",
+     *   "answer": { user details }
+     * }
+     */
     static async addUser(req: Request, res: Response) {
         const mt5 = getMt5Client();
         const service = new UserService(mt5);
 
         try {
-            const user = await service.addUser(req.body);
-            res.json({ success: true, data: user });
+            // Merge query parameters with body (body takes precedence)
+            // Support both lowercase (query-style) and PascalCase (JSON-style) parameter names
+            const params: any = {};
+
+            // Extract from query string (lowercase keys)
+            const q = req.query;
+            if (q.login) params.Login = String(q.login);
+            if (q.pass_main) params.PassMain = String(q.pass_main);
+            if (q.pass_investor) params.PassInvestor = String(q.pass_investor);
+            if (q.rights) params.Rights = String(q.rights);
+            if (q.group) params.Group = String(q.group);
+            if (q.name) params.Name = String(q.name);
+            if (q.company) params.Company = String(q.company);
+            if (q.language) params.Language = String(q.language);
+            if (q.country) params.Country = String(q.country);
+            if (q.city) params.City = String(q.city);
+            if (q.state) params.State = String(q.state);
+            if (q.zipcode) params.ZipCode = String(q.zipcode);
+            if (q.address) params.Address = String(q.address);
+            if (q.phone) params.Phone = String(q.phone);
+            if (q.email) params.Email = String(q.email);
+            if (q.id) params.ID = String(q.id);
+            if (q.status) params.Status = String(q.status);
+            if (q.comment) params.Comment = String(q.comment);
+            if (q.color) params.Color = String(q.color);
+            if (q.pass_phone) params.PhonePassword = String(q.pass_phone);
+            if (q.leverage) params.Leverage = Number(q.leverage);
+            if (q.account) params.Account = String(q.account);
+            if (q.agent) params.Agent = String(q.agent);
+
+            // Extract from body (both lowercase and PascalCase supported)
+            const b = req.body || {};
+            if (b.Login || b.login) params.Login = String(b.Login || b.login);
+            if (b.PassMain || b.pass_main) params.PassMain = String(b.PassMain || b.pass_main);
+            if (b.PassInvestor || b.pass_investor) params.PassInvestor = String(b.PassInvestor || b.pass_investor);
+            if (b.Rights || b.rights) params.Rights = String(b.Rights || b.rights);
+            if (b.Group || b.group) params.Group = String(b.Group || b.group);
+            if (b.Name || b.name) params.Name = String(b.Name || b.name);
+            if (b.Company || b.company) params.Company = String(b.Company || b.company);
+            if (b.Language || b.language) params.Language = String(b.Language || b.language);
+            if (b.Country || b.country) params.Country = String(b.Country || b.country);
+            if (b.City || b.city) params.City = String(b.City || b.city);
+            if (b.State || b.state) params.State = String(b.State || b.state);
+            if (b.ZipCode || b.zipcode) params.ZipCode = String(b.ZipCode || b.zipcode);
+            if (b.Address || b.address) params.Address = String(b.Address || b.address);
+            if (b.Phone || b.phone) params.Phone = String(b.Phone || b.phone);
+            if (b.Email || b.email) params.Email = String(b.Email || b.email);
+            if (b.ID || b.id) params.ID = String(b.ID || b.id);
+            if (b.Status || b.status) params.Status = String(b.Status || b.status);
+            if (b.Comment || b.comment) params.Comment = String(b.Comment || b.comment);
+            if (b.Color || b.color) params.Color = String(b.Color || b.color);
+            if (b.PhonePassword || b.pass_phone) params.PhonePassword = String(b.PhonePassword || b.pass_phone);
+            if (b.Leverage !== undefined || b.leverage !== undefined) params.Leverage = Number(b.Leverage ?? b.leverage);
+            if (b.Account || b.account) params.Account = String(b.Account || b.account);
+            if (b.Agent || b.agent) params.Agent = String(b.Agent || b.agent);
+            if (b.MQID) params.MQID = String(b.MQID);
+
+            // Validate required fields
+            const missingFields: string[] = [];
+            if (!params.PassMain) missingFields.push('PassMain (or pass_main)');
+            if (!params.PassInvestor) missingFields.push('PassInvestor (or pass_investor)');
+            if (!params.Group) missingFields.push('Group (or group)');
+            if (!params.Name) missingFields.push('Name (or name)');
+
+            if (missingFields.length > 0) {
+                return res.status(400).json({
+                    retcode: '3 Invalid request',
+                    error: `Missing required fields: ${missingFields.join(', ')}`
+                });
+            }
+
+            // Set default leverage if not provided (MT5 requires it)
+            if (params.Leverage === undefined || params.Leverage === null || isNaN(params.Leverage)) {
+                params.Leverage = 100; // Default leverage
+            }
+
+            const user = await service.addUser(params);
+
+            // Return in MT5 Web API response format
+            res.json({
+                retcode: '0 Done',
+                answer: user
+            });
         } catch (err: any) {
-            res.status(400).json({ success: false, error: err.message });
+            // Return error in MT5 format
+            res.status(400).json({
+                retcode: err.message || 'Error',
+                error: err.message
+            });
         }
     }
 
+    /**
+     * Update a user account on the MT5 trade server.
+     * 
+     * Required fields: login (in query or body)
+     * 
+     * Response format:
+     * {
+     *   "retcode": "0 Done",
+     *   "answer": { user details }
+     * }
+     */
     static async updateUser(req: Request, res: Response) {
         const mt5 = getMt5Client();
         const service = new UserService(mt5);
 
         try {
-            const user = await service.updateUser(req.body);
-            res.json({ success: true, data: user });
+            // Merge query parameters with body (body takes precedence)
+            const params: any = {};
+
+            // Extract from query string (lowercase keys)
+            const q = req.query;
+            if (q.login) params.login = q.login;
+            if (q.rights) params.rights = q.rights;
+            if (q.group) params.group = q.group;
+            if (q.name) params.name = q.name;
+            if (q.company) params.company = q.company;
+            if (q.language) params.language = q.language;
+            if (q.country) params.country = q.country;
+            if (q.city) params.city = q.city;
+            if (q.state) params.state = q.state;
+            if (q.zipcode) params.zipcode = q.zipcode;
+            if (q.address) params.address = q.address;
+            if (q.phone) params.phone = q.phone;
+            if (q.email) params.email = q.email;
+            if (q.id) params.id = q.id;
+            if (q.status) params.status = q.status;
+            if (q.comment) params.comment = q.comment;
+            if (q.color) params.color = q.color;
+            if (q.pass_phone) params.pass_phone = q.pass_phone;
+            if (q.leverage) params.leverage = q.leverage;
+            if (q.account) params.account = q.account;
+            if (q.agent) params.agent = q.agent;
+
+            // Extract from body (both lowercase and PascalCase supported)
+            const b = req.body || {};
+            if (b.Login || b.login) params.Login = b.Login || b.login;
+            if (b.Rights || b.rights) params.Rights = b.Rights || b.rights;
+            if (b.Group || b.group) params.Group = b.Group || b.group;
+            if (b.Name || b.name) params.Name = b.Name || b.name;
+            if (b.Company || b.company) params.Company = b.Company || b.company;
+            if (b.Language || b.language) params.Language = b.Language || b.language;
+            if (b.Country || b.country) params.Country = b.Country || b.country;
+            if (b.City || b.city) params.City = b.City || b.city;
+            if (b.State || b.state) params.State = b.State || b.state;
+            if (b.ZipCode || b.zipcode) params.ZipCode = b.ZipCode || b.zipcode;
+            if (b.Address || b.address) params.Address = b.Address || b.address;
+            if (b.Phone || b.phone) params.Phone = b.Phone || b.phone;
+            if (b.Email || b.email) params.Email = b.Email || b.email;
+            if (b.ID || b.id) params.ID = b.ID || b.id;
+            if (b.Status || b.status) params.Status = b.Status || b.status;
+            if (b.Comment || b.comment) params.Comment = b.Comment || b.comment;
+            if (b.Color || b.color) params.Color = b.Color || b.color;
+            if (b.PhonePassword || b.pass_phone) params.PhonePassword = b.PhonePassword || b.pass_phone;
+            if (b.Leverage !== undefined || b.leverage !== undefined) params.Leverage = b.Leverage ?? b.leverage;
+            if (b.Account || b.account) params.Account = b.Account || b.account;
+            if (b.Agent || b.agent) params.Agent = b.Agent || b.agent;
+            if (b.MQID) params.MQID = b.MQID;
+
+            // Validate required field: login
+            const login = params.Login || params.login;
+            if (!login) {
+                return res.status(400).json({
+                    retcode: '3 Invalid request',
+                    error: 'Missing required field: login'
+                });
+            }
+
+            const user = await service.updateUser(params);
+
+            // Return in MT5 Web API response format
+            res.json({
+                retcode: '0 Done',
+                answer: user
+            });
         } catch (err: any) {
-            res.status(400).json({ success: false, error: err.message });
+            res.status(400).json({
+                retcode: err.message || 'Error',
+                error: err.message
+            });
         }
     }
 

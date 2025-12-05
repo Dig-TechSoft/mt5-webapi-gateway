@@ -8,11 +8,11 @@ router.route('/get').get(UserController.getUser).post(UserController.getUser);
 
 router.route('/get_batch').get(UserController.getUserBatch).post(UserController.getUserBatch);
 
-// POST /api/user/add
-router.post('/add', UserController.addUser);
+// POST /api/user/add (or GET /api/user/add with query params)
+router.route('/add').get(UserController.addUser).post(UserController.addUser);
 
-// POST /api/user/update
-router.post('/update', UserController.updateUser);
+// GET/POST /api/user/update
+router.route('/update').get(UserController.updateUser).post(UserController.updateUser);
 
 // POST /api/user/delete
 router.route('/delete').get(UserController.deleteUser).post(UserController.deleteUser);

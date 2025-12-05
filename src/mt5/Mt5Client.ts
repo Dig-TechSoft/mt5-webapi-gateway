@@ -534,12 +534,159 @@ export class Mt5Client {
         return this.request<UserInfo[]>('/api/user/get_batch', 'GET', queryParams);
     }
 
+    /**
+     * Add a new user account to the MT5 trade server.
+     * 
+     * Required fields: PassMain, PassInvestor, Group, Name, Leverage
+     */
     async addUser(params: UserAddParams): Promise<UserInfo> {
-        return this.request<UserInfo>('/api/user/add', 'POST', params);
+        // Build params with lowercase keys (MT5 query param format)
+        const formParams: Record<string, any> = {};
+
+        if (params.Login) formParams.login = String(params.Login);
+        if (params.PassMain) formParams.pass_main = params.PassMain;
+        if (params.PassInvestor) formParams.pass_investor = params.PassInvestor;
+        if (params.Group) formParams.group = params.Group;
+        if (params.Name) formParams.name = params.Name;
+        if (params.Leverage !== undefined) formParams.leverage = String(params.Leverage);
+        if (params.Rights) formParams.rights = params.Rights;
+        if (params.Company) formParams.company = params.Company;
+        if (params.Language) formParams.language = params.Language;
+        if (params.Country) formParams.country = params.Country;
+        if (params.City) formParams.city = params.City;
+        if (params.State) formParams.state = params.State;
+        if (params.ZipCode) formParams.zipcode = params.ZipCode;
+        if (params.Address) formParams.address = params.Address;
+        if (params.Phone) formParams.phone = params.Phone;
+        if (params.Email) formParams.email = params.Email;
+        if (params.ID) formParams.id = params.ID;
+        if (params.Status) formParams.status = params.Status;
+        if (params.Comment) formParams.comment = params.Comment;
+        if (params.Color) formParams.color = params.Color;
+        if (params.PhonePassword) formParams.pass_phone = params.PhonePassword;
+        if (params.Account) formParams.account = params.Account;
+        if (params.Agent) formParams.agent = params.Agent;
+
+        console.log('[addUser] Params:', JSON.stringify(formParams, null, 2));
+
+        // Method 1: Try GET with query params (explicitly documented in MT5 API)
+        try {
+            console.log('[addUser] Trying GET request...');
+            const result = await this.request<UserInfo>('/api/user/add', 'GET', formParams);
+            console.log('[addUser] GET Success:', result);
+            return result;
+        } catch (err: any) {
+            console.error('[addUser] GET failed:', err?.message || err);
+        }
+
+        // Method 2: Try POST with form-encoded body
+        try {
+            console.log('[addUser] Trying POST form-encoded...');
+            const result = await this.request<UserInfo>('/api/user/add', 'POST', formParams);
+            console.log('[addUser] POST Success:', result);
+            return result;
+        } catch (err: any) {
+            console.error('[addUser] POST failed:', err?.message || err);
+            throw err;
+        }
     }
 
+    /**
+     * Update a user account on the MT5 trade server.
+     * 
+     * Required fields: login
+     */
     async updateUser(params: UserUpdateParams): Promise<UserInfo> {
-        return this.request<UserInfo>('/api/user/update', 'POST', params);
+        // Build params with lowercase keys (MT5 query param format)
+        const formParams: Record<string, any> = {};
+
+        // Get login (required) - support both cases
+        const login = params.Login ?? params.login;
+        if (login) formParams.login = String(login);
+
+        // Map params to lowercase keys
+        const rights = params.Rights ?? params.rights;
+        if (rights) formParams.rights = rights;
+
+        const group = params.Group ?? params.group;
+        if (group) formParams.group = group;
+
+        const name = params.Name ?? params.name;
+        if (name) formParams.name = name;
+
+        const company = params.Company ?? params.company;
+        if (company) formParams.company = company;
+
+        const language = params.Language ?? params.language;
+        if (language) formParams.language = language;
+
+        const country = params.Country ?? params.country;
+        if (country) formParams.country = country;
+
+        const city = params.City ?? params.city;
+        if (city) formParams.city = city;
+
+        const state = params.State ?? params.state;
+        if (state) formParams.state = state;
+
+        const zipcode = params.ZipCode ?? params.zipcode;
+        if (zipcode) formParams.zipcode = zipcode;
+
+        const address = params.Address ?? params.address;
+        if (address) formParams.address = address;
+
+        const phone = params.Phone ?? params.phone;
+        if (phone) formParams.phone = phone;
+
+        const email = params.Email ?? params.email;
+        if (email) formParams.email = email;
+
+        const id = params.ID ?? params.id;
+        if (id) formParams.id = id;
+
+        const status = params.Status ?? params.status;
+        if (status) formParams.status = status;
+
+        const comment = params.Comment ?? params.comment;
+        if (comment) formParams.comment = comment;
+
+        const color = params.Color ?? params.color;
+        if (color !== undefined) formParams.color = String(color);
+
+        const passPhone = params.PhonePassword ?? params.pass_phone;
+        if (passPhone) formParams.pass_phone = passPhone;
+
+        const leverage = params.Leverage ?? params.leverage;
+        if (leverage !== undefined) formParams.leverage = String(leverage);
+
+        const account = params.Account ?? params.account;
+        if (account) formParams.account = account;
+
+        const agent = params.Agent ?? params.agent;
+        if (agent) formParams.agent = agent;
+
+        console.log('[updateUser] Params:', JSON.stringify(formParams, null, 2));
+
+        // Method 1: Try GET with query params (explicitly documented in MT5 API)
+        try {
+            console.log('[updateUser] Trying GET request...');
+            const result = await this.request<UserInfo>('/api/user/update', 'GET', formParams);
+            console.log('[updateUser] GET Success:', result);
+            return result;
+        } catch (err: any) {
+            console.error('[updateUser] GET failed:', err?.message || err);
+        }
+
+        // Method 2: Try POST with form-encoded body
+        try {
+            console.log('[updateUser] Trying POST form-encoded...');
+            const result = await this.request<UserInfo>('/api/user/update', 'POST', formParams);
+            console.log('[updateUser] POST Success:', result);
+            return result;
+        } catch (err: any) {
+            console.error('[updateUser] POST failed:', err?.message || err);
+            throw err;
+        }
     }
 
     async deleteUser(login: number): Promise<void> {

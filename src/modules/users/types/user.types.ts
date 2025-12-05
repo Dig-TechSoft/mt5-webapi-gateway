@@ -73,35 +73,61 @@ export interface UserAddParams {
     Comment?: string;
     Color?: string;
     PhonePassword?: string;
-    Account?: string;  // External bank account
-    Agent?: string;  // Agent account number
+    Account?: string;
+    Agent?: string;
     MQID?: string;
 }
 
 export interface UserUpdateParams {
-    login: number;
+    Login?: number | string;
+    login?: number | string;
+    Rights?: string;
+    rights?: string;
+    Group?: string;
     group?: string;
+    Name?: string;
     name?: string;
-    email?: string;
+    Company?: string;
+    company?: string;
+    Language?: string;
+    language?: string;
+    Country?: string;
     country?: string;
+    City?: string;
     city?: string;
+    State?: string;
     state?: string;
+    ZipCode?: string;
     zipcode?: string;
+    Address?: string;
     address?: string;
+    Phone?: string;
     phone?: string;
-    comment?: string;
+    Email?: string;
+    email?: string;
+    ID?: string;
     id?: string;
+    Status?: string;
     status?: string;
-    leverage?: number;
+    Comment?: string;
+    comment?: string;
+    Color?: string | number;
+    color?: string | number;
+    PhonePassword?: string;
+    pass_phone?: string;
+    Leverage?: number | string;
+    leverage?: number | string;
+    Account?: string;
+    account?: string;
+    Agent?: string;
     agent?: string;
-    color?: number;
-    phone_password?: string;
+    MQID?: string;
 }
 
 export interface UserChangePasswordParams {
     login: number;
     password: string;
-    type: PasswordType; // use lowercase types (main, investor, api)
+    type: PasswordType;
 }
 
 export type PasswordType = 'main' | 'investor' | 'api';
